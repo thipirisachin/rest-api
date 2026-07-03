@@ -235,23 +235,29 @@ def make_router(entity: EntityDef) -> APIRouter:
                 )
 
     # ── POST /bulk ────────────────────────────────────────────────────────────
+    # request_body is a raw dict so Pydantic doesn't reject CSV data with
+    # type mismatches (e.g. integer id fields sent as strings). Coercion
+    # happens inside _fields_from_data per item. BulkRequestModel is kept
+    # for OpenAPI docs only via openapi_extra.
     @router.post(
         "/bulk",
         response_model=BulkResult,
         responses={**_AUTH_ERRORS},
         dependencies=[Depends(require_token)],
+        openapi_extra={
+            "requestBody": {
+                "required": True,
+                "content": {
+                    "application/json": {
+                        "schema": {"$ref": f"#/components/schemas/{BulkRequestModel.__name__}"}
+                    }
+                },
+            }
+        },
     )
-    async def bulk_upsert(request_body: BulkRequestModel):
-        # model_dump gives us dicts with already-coerced values from Pydantic,
-        # but we re-coerce through _fields_from_data to handle CSV edge cases
-        # (empty strings, numeric strings) that Pydantic would reject up-front.
-        # We therefore accept the raw payload via the typed model for OpenAPI docs
-        # but treat each item's values as unvalidated strings internally.
-        try:
-            raw_items = request_body.model_dump()["items"]
-        except Exception:
-            raise HTTPException(status_code=422, detail="'items' must be a non-empty array")
-        if not raw_items:
+    async def bulk_upsert(request_body: dict):
+        raw_items = request_body.get("items", [])
+        if not isinstance(raw_items, list) or not raw_items:
             raise HTTPException(status_code=422, detail="'items' must be a non-empty array")
         if len(raw_items) > 5000:
             raise HTTPException(
