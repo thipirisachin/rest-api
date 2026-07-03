@@ -690,10 +690,17 @@
       if (items.length) {
         setStatus(`Importing ${items.length} rows into ${tableName}…`, 'info');
         try {
-          await fetch(`${base()}/${tableName}/bulk`, {
+          const bulkRes = await fetch(`${base()}/${tableName}/bulk`, {
             method: 'POST', headers: authHeaders(),
             body: JSON.stringify({ items }),
           });
+          const bulkData = await bulkRes.json();
+          if (!bulkRes.ok) {
+            setStatus(`Table created but import failed: ${JSON.stringify(bulkData.detail)}`, 'error');
+            closeModal(); ACTIVE = tableName; await init(); return;
+          }
+          const errNote = bulkData.errors?.length ? ` (${bulkData.errors.length} row error(s))` : '';
+          setStatus(`Table '${tableName}' created — ${bulkData.inserted} rows imported${errNote}`, bulkData.errors?.length ? 'info' : 'ok');
         } catch (e) {
           setStatus(`Table created but import failed: ${e.message}`, 'error');
         }
@@ -703,7 +710,9 @@
     closeModal();
     ACTIVE = tableName;
     await init();   // re-fetch schema + rebuild tabs
-    setStatus(`Table '${tableName}' created${doImport ? ' and data imported' : ''}`, 'ok');
+    if (!doImport || !modalCsvRows.length) {
+      setStatus(`Table '${tableName}' created`, 'ok');
+    }
   }
 
   // ── Utils ─────────────────────────────────────────────────────────────────

@@ -242,8 +242,18 @@ def make_router(entity: EntityDef) -> APIRouter:
         dependencies=[Depends(require_token)],
     )
     async def bulk_upsert(request_body: BulkRequestModel):
-        items = [item.model_dump() for item in request_body.items]
-        if len(items) > 5000:
+        # model_dump gives us dicts with already-coerced values from Pydantic,
+        # but we re-coerce through _fields_from_data to handle CSV edge cases
+        # (empty strings, numeric strings) that Pydantic would reject up-front.
+        # We therefore accept the raw payload via the typed model for OpenAPI docs
+        # but treat each item's values as unvalidated strings internally.
+        try:
+            raw_items = request_body.model_dump()["items"]
+        except Exception:
+            raise HTTPException(status_code=422, detail="'items' must be a non-empty array")
+        if not raw_items:
+            raise HTTPException(status_code=422, detail="'items' must be a non-empty array")
+        if len(raw_items) > 5000:
             raise HTTPException(
                 status_code=422, detail="Maximum 5 000 items per bulk request"
             )
@@ -254,7 +264,7 @@ def make_router(entity: EntityDef) -> APIRouter:
             existing = {
                 r[0] for r in conn.execute(f"SELECT id FROM {table}").fetchall()
             }
-            for item in items:
+            for item in raw_items:
                 rid = item.get("id", "")
                 if not rid:
                     errors.append("item missing 'id'")
