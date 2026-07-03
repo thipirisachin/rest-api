@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REST API Manager</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; padding: 24px; }
+
+    h1 { font-size: 1.4rem; font-weight: 600; color: #f8fafc; margin-bottom: 4px; }
+    .subtitle { font-size: 0.85rem; color: #64748b; margin-bottom: 24px; }
+
+    input, textarea, select {
+      background: #1e2130; border: 1px solid #2d3348; color: #e2e8f0;
+      border-radius: 6px; padding: 8px 12px; font-size: 0.875rem; outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #6366f1; }
+
+    button {
+      padding: 8px 16px; border: none; border-radius: 6px;
+      font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-success { background: #22c55e; color: #fff; }
+    .btn-warning { background: #f59e0b; color: #fff; }
+    .btn-danger  { background: #ef4444; color: #fff; }
+    .btn-neutral { background: #2d3348; color: #e2e8f0; }
+
+    .card { background: #1a1f2e; border: 1px solid #2d3348; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    .card-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 14px; }
+
+    .form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 0.75rem; color: #94a3b8; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { text-align: left; padding: 8px 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; border-bottom: 1px solid #2d3348; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1e2433; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #1e2433; }
+    .id-cell { font-family: monospace; font-size: 0.8rem; color: #94a3b8; }
+    .date-cell { font-size: 0.78rem; color: #64748b; }
+    .action-btns { display: flex; gap: 6px; }
+    .action-btns button { padding: 4px 10px; font-size: 0.8rem; }
+    .edit-row td { background: #1e2433; }
+    .edit-row input { padding: 5px 8px; }
+    .empty-state { text-align: center; padding: 40px; color: #475569; font-size: 0.9rem; }
+
+    .status-bar { margin-top: 16px; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; display: none; }
+    .status-ok    { background: #14261d; border: 1px solid #166534; color: #4ade80; display: block; }
+    .status-error { background: #2a1215; border: 1px solid #991b1b; color: #f87171; display: block; }
+    .status-info  { background: #1a1f2e; border: 1px solid #2d3348; color: #94a3b8; display: block; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+    .badge-green { background: #14261d; color: #4ade80; border: 1px solid #166534; }
+    .badge-red   { background: #2a1215; color: #f87171; border: 1px solid #991b1b; }
+
+    /* entity tabs row */
+    .tabs-row { display: flex; align-items: flex-end; gap: 6px; margin-bottom: -1px; flex-wrap: wrap; }
+    .entity-tab {
+      padding: 8px 18px; border-radius: 8px 8px 0 0;
+      font-size: 0.875rem; font-weight: 500; cursor: pointer;
+      background: #14182a; border: 1px solid #2d3348; border-bottom: none; color: #64748b;
+    }
+    .entity-tab.active { background: #1a1f2e; color: #e2e8f0; border-bottom: 1px solid #1a1f2e; }
+    #btn-new-table { border-radius: 8px; font-size: 0.8rem; padding: 6px 14px; margin-bottom: 1px; }
+
+    /* bulk tabs */
+    .tab-bar { display: flex; gap: 2px; margin-bottom: 14px; }
+    .tab { padding: 6px 16px; border-radius: 6px 6px 0 0; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: #14182a; border: 1px solid #2d3348; border-bottom: none; color: #64748b; }
+    .tab.active { background: #1e2433; color: #e2e8f0; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    textarea.bulk-input { width: 100%; height: 140px; font-family: monospace; font-size: 0.8rem; resize: vertical; }
+    .bulk-hint { font-size: 0.75rem; color: #475569; margin-top: 6px; }
+    .bulk-result { margin-top: 10px; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; display: none; }
+    .drop-zone { border: 2px dashed #2d3348; border-radius: 8px; padding: 24px; text-align: center; color: #475569; font-size: 0.85rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+    .drop-zone.dragover { border-color: #6366f1; color: #a5b4fc; }
+
+    /* ── modal ────────────────────────────────────────────────── */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #1a1f2e; border: 1px solid #2d3348; border-radius: 12px;
+      padding: 28px; width: 620px; max-width: 96vw; max-height: 90vh;
+      overflow-y: auto; position: relative;
+    }
+    .modal h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; }
+    .modal .sub { font-size: 0.8rem; color: #64748b; margin-bottom: 20px; }
+
+    .modal-field-row {
+      display: grid;
+      grid-template-columns: 1fr 130px 90px 24px;
+      gap: 8px; align-items: center;
+      margin-bottom: 6px;
+    }
+    .modal-field-row.header { margin-bottom: 4px; }
+    .modal-field-row.header span { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+    .modal-field-row input[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .modal-field-row .del-btn {
+      background: none; border: none; color: #475569; font-size: 1rem;
+      cursor: pointer; padding: 2px; border-radius: 4px; line-height: 1;
+    }
+    .modal-field-row .del-btn:hover { color: #ef4444; }
+
+    .modal-error { color: #f87171; font-size: 0.8rem; margin-top: 10px; min-height: 18px; }
+    .modal-footer { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+    .import-check { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 0.875rem; color: #94a3b8; }
+    .import-check input[type=checkbox] { width: 16px; height: 16px; accent-color: #6366f1; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<h1>REST API Manager</h1>
+<p class="subtitle">Schema-driven data manager</p>
+
+<!-- Connection -->
+<div class="card">
+  <div class="card-title">Connection</div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>API Base URL</label>
+      <input id="base-url" value="" placeholder="http://localhost:3333" style="width:280px" />
+    </div>
+    <div class="form-group">
+      <label>Bearer Token</label>
+      <input id="token-input" type="password" placeholder="your-secret-token" style="width:220px;font-family:monospace" />
+    </div>
+    <button class="btn-primary" onclick="init()">Connect</button>
+    <span id="health-badge"></span>
+  </div>
+</div>
+
+<!-- Entity tabs + new table button -->
+<div class="tabs-row" id="entity-tabs">
+  <button class="btn-neutral" id="btn-new-table" onclick="openNewTableModal()">＋ New Table from CSV</button>
+</div>
+
+<!-- Dynamic content -->
+<div id="entity-area"></div>
+
+<div id="status" class="status-bar"></div>
+
+<!-- ── New table modal ───────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="handleBackdropClick(event)">
+  <div class="modal">
+    <h2>Create Table from CSV</h2>
+    <p class="sub">Review columns, adjust types and required flags, then create.</p>
+
+    <div class="form-group" style="margin-bottom:16px">
+      <label>Table name</label>
+      <input id="modal-table-name" placeholder="my_table" style="width:220px" />
+    </div>
+
+    <div class="modal-field-row header">
+      <span>Column name</span><span>Type</span><span>Required</span><span></span>
+    </div>
+    <div id="modal-fields"></div>
+
+    <button class="btn-neutral" style="margin-top:10px;font-size:0.8rem;padding:5px 12px" onclick="addModalField()">＋ Add column</button>
+
+    <div class="import-check">
+      <input type="checkbox" id="modal-import-data" checked />
+      <label for="modal-import-data">Import CSV rows into table after creation</label>
+    </div>
+
+    <div class="modal-error" id="modal-error"></div>
+
+    <div class="modal-footer">
+      <button class="btn-neutral" onclick="closeModal()">Cancel</button>
+      <button class="btn-success" onclick="submitCreateTable()">Create Table</button>
+    </div>
+  </div>
+</div>
+
+<!-- hidden file inputs -->
+<input id="csv-new-table-file" type="file" accept=".csv" style="display:none" onchange="handleNewTableFile(event)" />
+
+<script>
+  document.getElementById('base-url').value = window.location.origin;
+
+  let SCHEMA = [];
+  let ACTIVE = null;
+  let csvParsed = null;        // {name, items}
+  let modalCsvRows = [];       // raw parsed rows for import
+  let modalCsvHeaders = [];    // original header names from CSV
+
+  function base() { return document.getElementById('base-url').value.replace(/\/$/, ''); }
+  function token() { return document.getElementById('token-input').value.trim(); }
+  function authHeaders() { return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token()}` }; }
+
+  function setStatus(msg, type = 'info') {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = `status-bar status-${type}`;
+  }
+
+  // ── Init / connect ────────────────────────────────────────────────────────
+
+  async function init() {
+    try {
+      const r = await fetch(`${base()}/health`);
+      document.getElementById('health-badge').innerHTML =
+        r.ok ? '<span class="badge badge-green">API online</span>'
+             : '<span class="badge badge-red">API error</span>';
+    } catch {
+      document.getElementById('health-badge').innerHTML = '<span class="badge badge-red">Unreachable</span>';
+      setStatus('Cannot reach API', 'error');
+      return;
+    }
+    try {
+      const r = await fetch(`${base()}/schema`);
+      SCHEMA = await r.json();
+    } catch (e) {
+      setStatus(`Failed to load schema: ${e.message}`, 'error');
+      return;
+    }
+    renderEntityTabs();
+    if (SCHEMA.length && ACTIVE && SCHEMA.find(e => e.name === ACTIVE)) {
+      selectEntity(ACTIVE);
+    } else if (SCHEMA.length) {
+      selectEntity(SCHEMA[0].name);
+    }
+  }
+
+  function renderEntityTabs() {
+    const bar = document.getElementById('entity-tabs');
+    // keep the "new table" button, replace the rest
+    const btn = document.getElementById('btn-new-table');
+    bar.innerHTML = '';
+    SCHEMA.forEach(e => {
+      const tab = document.createElement('div');
+      tab.className = 'entity-tab' + (e.name === ACTIVE ? ' active' : '');
+      tab.id = `tab-${e.name}`;
+      tab.textContent = e.name;
+      tab.onclick = () => selectEntity(e.name);
+      bar.appendChild(tab);
+    });
+    bar.appendChild(btn);
+  }
+
+  function selectEntity(name) {
+    ACTIVE = name;
+    document.querySelectorAll('.entity-tab').forEach(t => t.classList.remove('active'));
+    const tab = document.getElementById(`tab-${name}`);
+    if (tab) tab.classList.add('active');
+    renderEntityArea(name);
+    loadRecords(name);
+  }
+
+  function entityDef(name) { return SCHEMA.find(e => e.name === name); }
+  function userFields(name) { return (entityDef(name)?.fields || []).filter(f => f.name !== 'id'); }
+
+  // ── Entity area ───────────────────────────────────────────────────────────
+
+  function renderEntityArea(name) {
+    const fields = userFields(name);
+    document.getElementById('entity-area').innerHTML = `
+      <div class="card">
+        <div class="card-title">Create ${name} record</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>id</label>
+            <input id="new-id-${name}" placeholder="record-1" style="width:130px" />
+          </div>
+          ${fields.map(f => `
+            <div class="form-group">
+              <label>${f.name}${f.required ? ' *' : ''}</label>
+              <input id="new-${f.name}-${name}" placeholder="${f.name}"
+                type="${f.type === 'real' || f.type === 'integer' ? 'number' : 'text'}"
+                step="any" style="width:150px" />
+            </div>
+          `).join('')}
+          <button class="btn-success" onclick="createRecord('${name}')">+ Create</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Bulk Import — upsert up to 5 000 records</div>
+        <div class="tab-bar">
+          <div class="tab active" id="btab-json-${name}" onclick="switchBulkTab('${name}','json')">JSON</div>
+          <div class="tab"        id="btab-csv-${name}"  onclick="switchBulkTab('${name}','csv')">CSV file</div>
+        </div>
+        <div id="bpanel-json-${name}" class="tab-panel active">
+          <textarea id="bulk-json-${name}" class="bulk-input"
+            placeholder='[{"id":"r-1","${fields[0]?.name||'name'}":"..."}]'></textarea>
+          <div class="bulk-hint">JSON array. Required fields: <code>id${fields.filter(f=>f.required).map(f=>', '+f.name).join('')}</code></div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button class="btn-primary" onclick="bulkFromJson('${name}')">Upload JSON</button>
+            <button class="btn-neutral" onclick="document.getElementById('bulk-json-${name}').value=''">Clear</button>
+          </div>
+        </div>
+        <div id="bpanel-csv-${name}" class="tab-panel">
+          <div class="drop-zone" id="drop-${name}"
+               onclick="document.getElementById('csv-file-${name}').click()"
+               ondragover="event.preventDefault();this.classList.add('dragover')"
+               ondragleave="this.classList.remove('dragover')"
+               ondrop="handleDrop(event,'${name}')">
+            Drop a .csv file here or click to browse
+          </div>
+          <input id="csv-file-${name}" type="file" accept=".csv" style="display:none"
+                 onchange="handleFileInput(event,'${name}')" />
+          <div class="bulk-hint" style="margin-top:8px">
+            Column order: <code>id, ${fields.map(f=>f.name).join(', ')}</code> — header row optional
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+            <button class="btn-primary" id="csv-btn-${name}" onclick="bulkFromCsv('${name}')" disabled>Upload CSV</button>
+            <span id="csv-fname-${name}" style="font-size:0.8rem;color:#64748b"></span>
+          </div>
+        </div>
+        <div id="bulk-result-${name}" class="bulk-result"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">${name} <span id="count-${name}" style="color:#475569;font-weight:400"></span></div>
+        <table>
+          <thead><tr id="thead-${name}"></tr></thead>
+          <tbody id="tbody-${name}"><tr><td colspan="99" class="empty-state">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    `;
+    const allCols = ['id', ...fields.map(f => f.name), 'updated_at', 'actions'];
+    document.getElementById(`thead-${name}`).innerHTML = allCols.map(c => `<th>${c}</th>`).join('');
+  }
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
+
+  async function loadRecords(name) {
+    setStatus('Loading…', 'info');
+    try {
+      const r = await fetch(`${base()}/${name}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const rows = await r.json();
+      renderTable(name, rows);
+      document.getElementById(`count-${name}`).textContent = `(${rows.length})`;
+      setStatus(`Loaded ${rows.length} record(s) from ${name}`, 'ok');
+    } catch (e) {
+      setStatus(`Load failed: ${e.message}`, 'error');
+    }
+  }
+
+  function renderTable(name, rows) {
+    const tbody = document.getElementById(`tbody-${name}`);
+    const fields = userFields(name);
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="99" class="empty-state">No records yet</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(row => {
+      const sid = esc(row.id);
+      return `<tr id="row-${name}-${row.id}">
+        <td class="id-cell">${sid}</td>
+        ${fields.map(f => `<td>${esc(row[f.name] ?? '')}</td>`).join('')}
+        <td class="date-cell">${formatDate(row.updated_at)}</td>
+        <td><div class="action-btns">
+          <button class="btn-warning" onclick="startEdit('${name}','${sid}')">Edit</button>
+          <button class="btn-danger"  onclick="deleteRecord('${name}','${sid}')">Delete</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function startEdit(name, id) {
+    const fields = userFields(name);
+    const row = document.getElementById(`row-${name}-${id}`);
+    const cells = row.querySelectorAll('td');
+    const vals = {};
+    fields.forEach((f, i) => { vals[f.name] = cells[i + 1].textContent; });
+    row.className = 'edit-row';
+    row.innerHTML = `
+      <td class="id-cell">${esc(id)}</td>
+      ${fields.map(f => `
+        <td><input id="edit-${name}-${f.name}-${id}" value="${esc(vals[f.name])}"
+          type="${f.type==='real'||f.type==='integer'?'number':'text'}" step="any" style="width:110px" /></td>
+      `).join('')}
+      <td class="date-cell">—</td>
+      <td><div class="action-btns">
+        <button class="btn-success" onclick="saveEdit('${name}','${esc(id)}')">Save</button>
+        <button class="btn-neutral" onclick="loadRecords('${name}')">Cancel</button>
+      </div></td>`;
+  }
+
+  async function saveEdit(name, id) {
+    const fields = userFields(name);
+    const body = {};
+    fields.forEach(f => {
+      const el = document.getElementById(`edit-${name}-${f.name}-${id}`);
+      if (el) body[f.name] = f.type==='real'||f.type==='integer' ? parseFloat(el.value) : el.value.trim();
+    });
+    setStatus('Saving…', 'info');
+    try {
+      const r = await fetch(`${base()}/${name}/${encodeURIComponent(id)}`, {
+        method: 'PATCH', headers: authHeaders(), body: JSON.stringify(body),
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(JSON.stringify(d.detail)); }
+      setStatus(`Updated '${id}' in ${name}`, 'ok');
+      await loadRecords(name);
+    } catch (e) { setStatus(`Update failed: ${e.message}`, 'error'); }
+  }
+
+  async function createRecord(name) {
+    const fields = userFields(name);
+    const id = document.getElementById(`new-id-${name}`).value.trim();
+    if (!id) { setStatus('ID is required', 'error'); return; }
+    const body = { id };
+    fields.forEach(f => {
+      const el = document.getElementById(`new-${f.name}-${name}`);
+      if (el) { const v = el.value.trim(); body[f.name] = f.type==='real'||f.type==='integer' ? parseFloat(v||0) : v; }
+    });
+    setStatus('Creating…', 'info');
+    try {
+      const r = await fetch(`${base()}/${name}`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify(body),
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(JSON.stringify(d.detail)); }
+      setStatus(`Created '${id}' in ${name}`, 'ok');
+      document.getElementById(`new-id-${name}`).value = '';
+      fields.forEach(f => { const el = document.getElementById(`new-${f.name}-${name}`); if (el) el.value = ''; });
+      await loadRecords(name);
+    } catch (e) { setStatus(`Create failed: ${e.message}`, 'error'); }
+  }
+
+  async function deleteRecord(name, id) {
+    if (!confirm(`Delete '${id}' from ${name}?`)) return;
+    setStatus('Deleting…', 'info');
+    try {
+      const r = await fetch(`${base()}/${name}/${encodeURIComponent(id)}`, {
+        method: 'DELETE', headers: authHeaders(),
+      });
+      if (!r.ok) { const d = await r.json(); throw new Error(d.detail); }
+      setStatus(`Deleted '${id}' from ${name}`, 'ok');
+      await loadRecords(name);
+    } catch (e) { setStatus(`Delete failed: ${e.message}`, 'error'); }
+  }
+
+  // ── Bulk (existing tables) ────────────────────────────────────────────────
+
+  function switchBulkTab(name, tab) {
+    ['json','csv'].forEach(t => {
+      document.getElementById(`btab-${t}-${name}`)?.classList.toggle('active', t===tab);
+      document.getElementById(`bpanel-${t}-${name}`)?.classList.toggle('active', t===tab);
+    });
+  }
+
+  function setBulkResult(name, msg, ok) {
+    const el = document.getElementById(`bulk-result-${name}`);
+    if (!el) return;
+    el.textContent = msg; el.style.display = 'block';
+    el.style.background = ok ? '#14261d' : '#2a1215';
+    el.style.border     = ok ? '1px solid #166534' : '1px solid #991b1b';
+    el.style.color      = ok ? '#4ade80' : '#f87171';
+  }
+
+  async function sendBulk(name, items) {
+    if (!items.length) { setBulkResult(name, 'Nothing to upload', false); return; }
+    setStatus(`Uploading ${items.length} items to ${name}…`, 'info');
+    try {
+      const r = await fetch(`${base()}/${name}/bulk`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ items }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(JSON.stringify(d.detail));
+      const errNote = d.errors?.length ? `  (${d.errors.length} error(s))` : '';
+      setBulkResult(name, `Done — ${d.inserted} inserted, ${d.updated} updated, ${d.total} total${errNote}`, !d.errors?.length);
+      setStatus(`Bulk upsert to ${name}: ${d.total} records`, 'ok');
+      await loadRecords(name);
+    } catch (e) {
+      setBulkResult(name, `Upload failed: ${e.message}`, false);
+      setStatus(`Bulk upload failed: ${e.message}`, 'error');
+    }
+  }
+
+  async function bulkFromJson(name) {
+    const raw = document.getElementById(`bulk-json-${name}`)?.value.trim();
+    if (!raw) { setBulkResult(name, 'Paste JSON first', false); return; }
+    let items;
+    try { items = JSON.parse(raw); if (!Array.isArray(items)) throw new Error('Must be array'); }
+    catch (e) { setBulkResult(name, `JSON error: ${e.message}`, false); return; }
+    await sendBulk(name, items);
+  }
+
+  function parseCSVGeneric(text) {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return { headers: [], rows: [] };
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').trim());
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',').map(p => p.trim().replace(/^"|"$/g, ''));
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = parts[j] ?? ''; });
+      rows.push(obj);
+    }
+    return { headers, rows };
+  }
+
+  function handleFileInput(e, name) { const f = e.target.files[0]; if (f) loadCsvFile(f, name); }
+  function handleDrop(e, name) {
+    e.preventDefault();
+    document.getElementById(`drop-${name}`)?.classList.remove('dragover');
+    const f = e.dataTransfer.files[0]; if (f) loadCsvFile(f, name);
+  }
+  function loadCsvFile(file, name) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const { headers, rows } = parseCSVGeneric(ev.target.result);
+      const fieldOrder = ['id', ...userFields(name).map(f => f.name)];
+      const items = rows.map(r => {
+        const obj = {};
+        fieldOrder.forEach(col => { if (r[col] !== undefined) obj[col] = r[col]; });
+        return obj;
+      }).filter(o => o.id);
+      csvParsed = { name, items };
+      document.getElementById(`csv-fname-${name}`).textContent = `${file.name} — ${items.length} row(s)`;
+      document.getElementById(`csv-btn-${name}`).disabled = items.length === 0;
+    };
+    reader.readAsText(file);
+  }
+  async function bulkFromCsv(name) {
+    if (!csvParsed || csvParsed.name !== name || !csvParsed.items.length) {
+      setBulkResult(name, 'No valid rows loaded', false); return;
+    }
+    await sendBulk(name, csvParsed.items);
+  }
+
+  // ── New Table from CSV modal ──────────────────────────────────────────────
+
+  function openNewTableModal() {
+    modalCsvRows = [];
+    modalCsvHeaders = [];
+    document.getElementById('modal-table-name').value = '';
+    document.getElementById('modal-fields').innerHTML = '';
+    document.getElementById('modal-error').textContent = '';
+    document.getElementById('modal-import-data').checked = true;
+    document.getElementById('modal-backdrop').classList.add('open');
+    // trigger file picker
+    document.getElementById('csv-new-table-file').value = '';
+    document.getElementById('csv-new-table-file').click();
+  }
+
+  function closeModal() {
+    document.getElementById('modal-backdrop').classList.remove('open');
+  }
+  function handleBackdropClick(e) {
+    if (e.target === document.getElementById('modal-backdrop')) closeModal();
+  }
+
+  function handleNewTableFile(e) {
+    const file = e.target.files[0];
+    if (!file) { closeModal(); return; }
+    // auto-fill table name from filename
+    const suggested = file.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/^_+|_+$/g, '');
+    document.getElementById('modal-table-name').value = suggested;
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const { headers, rows } = parseCSVGeneric(ev.target.result);
+      modalCsvHeaders = headers;
+      modalCsvRows = rows;
+      renderModalFields(headers, rows);
+    };
+    reader.readAsText(file);
+  }
+
+  function sniffType(values) {
+    const nonEmpty = values.filter(v => v !== '');
+    if (!nonEmpty.length) return 'text';
+    if (nonEmpty.every(v => /^-?\d+$/.test(v))) return 'integer';
+    if (nonEmpty.every(v => !isNaN(parseFloat(v)) && isFinite(v))) return 'real';
+    return 'text';
+  }
+
+  function renderModalFields(headers, rows) {
+    const sample = rows.slice(0, 20);
+    const container = document.getElementById('modal-fields');
+    container.innerHTML = headers.map((h, i) => {
+      const colVals = sample.map(r => r[h] ?? '');
+      const sniffed = sniffType(colVals);
+      const isId = h === 'id' || i === 0;
+      const fname = isId ? 'id' : h;
+      const locked = isId ? 'disabled' : '';
+      return `
+        <div class="modal-field-row" id="mfrow-${i}">
+          <input value="${esc(fname)}" ${locked} id="mf-name-${i}" placeholder="column_name" />
+          <select id="mf-type-${i}" ${isId ? 'disabled' : ''}>
+            <option value="text"    ${sniffed==='text'    ?'selected':''}>text</option>
+            <option value="real"    ${sniffed==='real'    ?'selected':''}>real</option>
+            <option value="integer" ${sniffed==='integer' ?'selected':''}>integer</option>
+          </select>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="mf-req-${i}" ${isId?'checked disabled':''} style="width:16px;height:16px;accent-color:#6366f1" />
+            <label for="mf-req-${i}" style="font-size:0.78rem;color:#94a3b8">req</label>
+          </div>
+          <button class="del-btn" onclick="removeModalField(${i})" ${isId?'disabled style="opacity:0.2"':''}>${isId?'':'✕'}</button>
+        </div>`;
+    }).join('');
+  }
+
+  function removeModalField(i) {
+    document.getElementById(`mfrow-${i}`)?.remove();
+  }
+
+  function addModalField() {
+    const container = document.getElementById('modal-fields');
+    const i = Date.now();
+    const div = document.createElement('div');
+    div.className = 'modal-field-row';
+    div.id = `mfrow-${i}`;
+    div.innerHTML = `
+      <input id="mf-name-${i}" placeholder="column_name" />
+      <select id="mf-type-${i}">
+        <option value="text" selected>text</option>
+        <option value="real">real</option>
+        <option value="integer">integer</option>
+      </select>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="mf-req-${i}" style="width:16px;height:16px;accent-color:#6366f1" />
+        <label for="mf-req-${i}" style="font-size:0.78rem;color:#94a3b8">req</label>
+      </div>
+      <button class="del-btn" onclick="this.closest('.modal-field-row').remove()">✕</button>`;
+    container.appendChild(div);
+  }
+
+  function collectModalFields() {
+    const rows = document.querySelectorAll('#modal-fields .modal-field-row');
+    const fields = [];
+    for (const row of rows) {
+      const id = row.id.replace('mfrow-', '');
+      const nameEl = document.getElementById(`mf-name-${id}`);
+      const typeEl = document.getElementById(`mf-type-${id}`);
+      const reqEl  = document.getElementById(`mf-req-${id}`);
+      if (!nameEl) continue;
+      const name = nameEl.value.trim().toLowerCase();
+      if (!name) continue;
+      fields.push({ name, type: typeEl?.value || 'text', required: reqEl?.checked || false });
+    }
+    return fields;
+  }
+
+  async function submitCreateTable() {
+    const tableName = document.getElementById('modal-table-name').value.trim().toLowerCase();
+    const errEl = document.getElementById('modal-error');
+    errEl.textContent = '';
+
+    if (!tableName) { errEl.textContent = 'Table name is required'; return; }
+    if (!/^[a-z][a-z0-9_]*$/.test(tableName)) {
+      errEl.textContent = 'Name must start with a letter, only letters/digits/underscores'; return;
+    }
+
+    const fields = collectModalFields();
+    if (!fields.length) { errEl.textContent = 'Add at least one column'; return; }
+    if (!fields.find(f => f.name === 'id')) { errEl.textContent = 'Must include an id column'; return; }
+
+    const doImport = document.getElementById('modal-import-data').checked && modalCsvRows.length > 0;
+
+    setStatus('Creating table…', 'info');
+    try {
+      const r = await fetch(`${base()}/tables`, {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ name: tableName, fields }),
+      });
+      const d = await r.json();
+      if (!r.ok) { errEl.textContent = JSON.stringify(d.detail); return; }
+    } catch (e) { errEl.textContent = `Error: ${e.message}`; return; }
+
+    // import rows if requested
+    if (doImport) {
+      const colNames = fields.map(f => f.name);
+      const items = modalCsvRows.map(row => {
+        const obj = {};
+        // try to match by column name; fall back to positional using original headers
+        colNames.forEach((col, ci) => {
+          const srcCol = modalCsvHeaders[ci] ?? col;
+          let val = row[col] ?? row[srcCol] ?? '';
+          const ftype = fields.find(f => f.name === col)?.type || 'text';
+          if (ftype === 'real' || ftype === 'integer') val = parseFloat(val) || 0;
+          obj[col] = val;
+        });
+        return obj;
+      }).filter(o => o.id);
+
+      if (items.length) {
+        setStatus(`Importing ${items.length} rows into ${tableName}…`, 'info');
+        try {
+          await fetch(`${base()}/${tableName}/bulk`, {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ items }),
+          });
+        } catch (e) {
+          setStatus(`Table created but import failed: ${e.message}`, 'error');
+        }
+      }
+    }
+
+    closeModal();
+    ACTIVE = tableName;
+    await init();   // re-fetch schema + rebuild tabs
+    setStatus(`Table '${tableName}' created${doImport ? ' and data imported' : ''}`, 'ok');
+  }
+
+  // ── Utils ─────────────────────────────────────────────────────────────────
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function formatDate(iso) { return iso ? new Date(iso).toLocaleString() : '—'; }
+
+  init();
+</script>
+</body>
+</html>
